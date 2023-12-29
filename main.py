@@ -1,23 +1,32 @@
-from elevenlabs import Voice, VoiceSettings, generate, play
-import os
-import whisper_timestamped
-os.environ['PATH'] += os.pathsep + 'C:/FFmpeg/bin'
+import threading
+from workspace import *
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+os.environ['PATH'] += os.pathsep + '___temps\\FFmpeg\\bin'
 
 
-class ViralVideo:
-    def __init__(self):
-        pass
+def fire_baby():
+    limit = 0
+    all_task = []
 
-    def get_lines(self):
-        pass
+    paired_files = get_line_and_voice()
+    num_video = 1
+    for _line, _voice_path in paired_files:
+        limit += 1
+        thread = threading.Thread(target=make_final_video, args=(_line, _voice_path, num_video))
+        thread.start()
+        all_task.append(thread)
+        num_video += 1
 
-    def generate_audio(self):
-        pass
+        if limit == 6:
+            for fire in all_task:
+                fire.join()
+            all_task = []
+            limit = 0
 
-    def get_subtitle(self):
-        pass
+    for fire in all_task:
+        fire.join()
 
 
 if __name__ == "__main__":
     pass
-
