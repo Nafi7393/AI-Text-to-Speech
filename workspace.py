@@ -158,5 +158,5 @@ def make_watermark_image(watermark, font_path='___temps/sub.ttf', image_quality=
 
 
 if __name__ == "__main__":
-    make_watermark_image("@Money_Magnet__Mindset")
+    video_with_back_videos(script="hi hello, how are you?", script_number=2)
 
