@@ -54,7 +54,7 @@ def get_file_paths_from_folder(folder_path, return_all_files=True):
         return random.choice(files)
 
 
-def make_reddit_first_image(title, story_sync_with_folder_num=1, font_path='___temps/sub.ttf',
+def make_reddit_first_image(title, story_sync_with_folder_num=1, font_path='___temps/subtitle.ttf',
                             image_quality=720, base_img_path="___temps/reddit.png"):
     text_left_margin = 110
     min_text_height = 585
@@ -85,7 +85,7 @@ def make_reddit_first_image(title, story_sync_with_folder_num=1, font_path='___t
     return f"__gen_images/{story_sync_with_folder_num}.png"
 
 
-def make_sub_images(word, word_num=1, folder_num=1, image_quality=720, font_path='___temps/sub.ttf',
+def make_sub_images(word, word_num=1, folder_num=1, image_quality=720, font_path='___temps/subtitle.ttf',
                     fill_color="white", stroke_color="black", stroke_width=10):
 
     word = word.replace(",", "")
@@ -123,11 +123,14 @@ def make_sub_images(word, word_num=1, folder_num=1, image_quality=720, font_path
     new_height = int(image_quality * (ratio[1] / ratio[0]))
     resized_image = image.resize((new_width, new_height), Image.ANTIALIAS)
 
-    if not os.path.exists(f"__gen_images/{folder_num}"):
-        os.makedirs(f"__gen_images/{folder_num}")
+    image_array = np.array(resized_image)
+    return image_array
 
-    resized_image.save(f"__gen_images/{folder_num}/{word_num}.png")
-    return f"__gen_images/{folder_num}/{word_num}.png"
+    # if not os.path.exists(f"__gen_images/{folder_num}"):
+        # os.makedirs(f"__gen_images/{folder_num}")
+
+    # resized_image.save(f"__gen_images/{folder_num}/{word_num}.png")
+    # return f"__gen_images/{folder_num}/{word_num}.png"
 
 
 def get_available_voices():
@@ -266,7 +269,7 @@ def get_line_and_voice(script='_SCRIPTs.txt', voice_folder="__voice"):
     return zip(lines, natsorted(generated_voices))
 
 
-def get_subtitles_details(voice_path, video_num, image_quality=720, script=None):
+def get_subtitles_details(voice_path, video_num, image_quality=720, sub_font_path='___temps/subtitle.ttf', script=None):
     model = whisper_timestamped.load_model("base")
     transcribe_result = whisper_timestamped.transcribe(model, voice_path)
 
@@ -281,7 +284,8 @@ def get_subtitles_details(voice_path, video_num, image_quality=720, script=None)
             end = _word["end"]
             duration = end - start
 
-            sub_img_clip_path = make_sub_images(text, file_num, video_num, image_quality=image_quality)
+            sub_img_clip_path = make_sub_images(text, file_num, video_num,
+                                                image_quality=image_quality, font_path=sub_font_path)
 
             details = [file_num, text, start, duration, sub_img_clip_path]
             all_subtitle_details.append(details)
@@ -368,6 +372,77 @@ def get_all_the_image_durations(total_duration, num_of_image, gap=1, generation_
         return get_all_the_image_durations(total_duration=total_duration, num_of_image=num_of_image,
                                            generation_num=generation_num+1)
 
+
+def draw_rect(image, width, height, x_center, transparency=255, stroke=True, center_y=0,
+              rect_color=(255, 255, 255), rect_outline_color=(255, 174, 0)):
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    if center_y == 0:
+        center_y = (image.height - height) // 2
+
+    x_start = x_center - width // 2
+    x_end = x_start + width
+    square_coordinates = (x_start, center_y, x_end, center_y + height)
+
+    transparent_rect_color = (rect_color[0], rect_color[1], rect_color[2], transparency)
+    transparent_outline_color = (rect_outline_color[0], rect_outline_color[1], rect_outline_color[2], transparency)
+
+    if stroke:
+        draw.rounded_rectangle(square_coordinates, radius=50,
+                               fill=transparent_rect_color, outline=transparent_outline_color)
+    else:
+        draw.rounded_rectangle(square_coordinates, radius=50, fill=transparent_rect_color)
+    image = Image.alpha_composite(image, overlay)
+
+    return image
+
+
+def make_watermark_image(watermark_txt, font_path='___temps/subtitle.ttf', image_quality=720, text_fill_color=(255, 255, 255),
+                         stroke_color=None, stroke_width=0, back_rect=True, rect_transparency=100, rect_stroke=False,
+                         back_rect_color=(255, 255, 255), back_rect_outline_color=(255, 174, 0)):
+    ratio = (9, 16)
+    width, height = (720, 1280)
+
+    image = Image.new('RGBA', (width, height), (255, 255, 255, 0))
+    draw = ImageDraw.Draw(image)
+
+    minimum_font_size = 1
+    max_font_size = 30
+    width_bounding_box = 150
+    max_font_width, max_font_height = width - width_bounding_box, height
+
+    while True:
+        font = ImageFont.truetype(font_path, minimum_font_size)
+        text_width, text_height = draw.textsize(watermark_txt, font=font)
+        if text_width >= max_font_width or text_height >= max_font_height:
+            break
+        elif minimum_font_size >= max_font_size:
+            break
+        minimum_font_size += 1
+
+    x = (width - text_width) // 2
+    y = 1080
+
+    draw.text((x, y), watermark_txt, font=font, fill=text_fill_color,
+              stroke_color=stroke_color, stroke_width=stroke_width)
+
+    if back_rect:
+        rect_width = text_width + 50
+        rect_height = text_height + (text_height*0.2)
+        rect_x_center = width // 2
+        rect_center_y = y + text_height // 2 - (text_height/2)
+
+        image = draw_rect(image=image, width=rect_width, height=rect_height, x_center=rect_x_center,
+                          transparency=rect_transparency, stroke=rect_stroke, center_y=rect_center_y,
+                          rect_color=back_rect_color, rect_outline_color=back_rect_outline_color)
+
+    new_width = image_quality
+    new_height = int(image_quality * (ratio[1] / ratio[0]))
+    resized_image = image.resize((new_width, new_height), Image.ANTIALIAS)
+
+    image_array = np.array(resized_image)
+    return ImageClip(image_array)
 
 
 
